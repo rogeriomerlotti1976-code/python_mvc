@@ -1,0 +1,266 @@
+import flet as ft
+
+
+class ViewCadastroBase:
+    def __init__(self, page: ft.Page, controller):
+        self.page = page
+        self.controller = controller
+
+        self._id_selecionado = None
+        self._novo_registro = False
+
+        self._grid = None
+        self._pagina = None
+
+    # ============================================================
+    # GRID
+    # ============================================================
+
+    def criar_linha_grid(self, registro) -> ft.DataRow:
+        """
+        Cria uma linha do DataTable.
+
+        O primeiro campo do registro deve ser o ID.
+        O clique simples seleciona o registro.
+        O duplo clique abre o registro para alteração.
+        """
+
+        # O primeiro campo do registro é o ID
+        id_registro = registro[0]
+
+        # Cria a linha primeiro.
+        # Isso é importante porque os eventos abaixo precisam
+        # referenciar a própria linha.
+        linha = ft.DataRow(
+            cells=[
+                ft.DataCell(
+                    ft.Text(
+                        '' if valor is None else str(valor)
+                    )
+                )
+                for valor in registro
+            ]
+        )
+
+        # --------------------------------------------------------
+        # Clique simples
+        # --------------------------------------------------------
+
+        def selecionar(e):
+            self._selecionar_linha(
+                id_registro,
+                linha
+            )
+
+        # --------------------------------------------------------
+        # Duplo clique
+        # --------------------------------------------------------
+
+        def alterar_duplo_clique(e):
+            # Guarda o ID selecionado
+            self._id_selecionado = id_registro
+
+            # Executa a mesma operação utilizada pelo botão
+            # "Alterar"
+            self._alterar_por_duplo_clique()
+
+        # Clique na linha
+        linha.on_select_change = selecionar
+
+        # --------------------------------------------------------
+        # Eventos das células
+        #
+        # DataRow não possui on_double_tap.
+        # DataCell possui on_tap e on_double_tap.
+        # --------------------------------------------------------
+
+        for celula in linha.cells:
+            celula.on_tap = selecionar
+            celula.on_double_tap = alterar_duplo_clique
+
+        return linha
+
+    # ============================================================
+    # SELEÇÃO
+    # ============================================================
+
+    def _selecionar_linha(
+            self,
+            id_registro,
+            linha: ft.DataRow
+    ):
+        """
+        Seleciona uma linha do grid.
+        """
+
+        self._id_selecionado = id_registro
+
+        print(
+            f'ID selecionado: {self._id_selecionado}'
+        )
+
+        self._atualizar_pagina()
+
+    # ============================================================
+    # ALTERAR
+    # ============================================================
+
+    def _alterar_clicked(self, e):
+        """
+        Evento do botão Alterar.
+        """
+
+        self._alterar_por_duplo_clique()
+
+    def _alterar_por_duplo_clique(self):
+        """
+        Carrega o registro selecionado e abre o formulário
+        para alteração.
+
+        Este método é utilizado tanto pelo botão Alterar
+        quanto pelo duplo clique no grid.
+        """
+
+        if self._id_selecionado is None:
+            self._mostrar_mensagem(
+                'Selecione um registro na lista para alterar.'
+            )
+
+            self._atualizar_pagina()
+            return
+
+        try:
+            # Carrega o registro através do Controller
+            self.controller.carregar(
+                self._id_selecionado
+            )
+
+            # Não é um novo registro
+            self._novo_registro = False
+
+            # Abre o formulário
+            self._exibir_formulario()
+
+        except Exception as ex:
+            self._mostrar_mensagem(
+                f'Erro ao carregar registro: {ex}'
+            )
+
+            self._atualizar_pagina()
+
+    # ============================================================
+    # EXCLUIR
+    # ============================================================
+
+    def _excluir_clicked(self, e):
+        """
+        Exclui o registro selecionado após confirmação.
+        """
+
+        print(
+            f'clicou no excluir -> '
+            f'id selecionado: {self._id_selecionado}'
+        )
+
+        if self._id_selecionado is None:
+            self._mostrar_mensagem(
+                'Selecione um registro na lista para excluir.'
+            )
+
+            self._atualizar_pagina()
+            return
+
+        # Guarda o ID para a função interna
+        id_selecionado = self._id_selecionado
+
+        def confirmar(e):
+            try:
+                self.controller.excluir(
+                    id_selecionado
+                )
+
+                self.page.pop_dialog()
+
+                self._exibir_pesquisa()
+
+                self._mostrar_mensagem(
+                    'Registro excluído com sucesso.'
+                )
+
+            except Exception as ex:
+                self.page.pop_dialog()
+
+                self._mostrar_mensagem(
+                    f'Erro ao excluir: {ex}'
+                )
+
+            self._atualizar_pagina()
+
+        def cancelar(e):
+            self.page.pop_dialog()
+
+        dialogo = ft.AlertDialog(
+            modal=True,
+
+            title=ft.Text(
+                'Confirmar exclusão'
+            ),
+
+            content=ft.Text(
+                'Deseja realmente excluir '
+                'o registro selecionado?'
+            ),
+
+            actions=[
+                ft.TextButton(
+                    'Cancelar',
+                    on_click=cancelar
+                ),
+
+                ft.TextButton(
+                    'Excluir',
+                    on_click=confirmar
+                ),
+            ],
+
+            actions_alignment=ft.MainAxisAlignment.END,
+        )
+
+        self.page.show_dialog(dialogo)
+
+    # ============================================================
+    # MÉTODOS AUXILIARES
+    # ============================================================
+
+    def _atualizar_pagina(self):
+        """
+        Atualiza a página.
+        """
+        self.page.update()
+
+    def _mostrar_mensagem(self, mensagem):
+        """
+        Exibe uma mensagem para o usuário.
+        """
+
+        snack_bar = ft.SnackBar(
+            content=ft.Text(mensagem)
+        )
+
+        self.page.show_dialog(snack_bar)
+
+    # ============================================================
+    # MÉTODOS QUE DEVEM SER IMPLEMENTADOS PELAS VIEWS
+    # ============================================================
+
+    def _exibir_formulario(self):
+        """
+        Deve ser implementado pela View concreta.
+        """
+        raise NotImplementedError
+
+    def _exibir_pesquisa(self):
+        """
+        Deve ser implementado pela View concreta.
+        """
+        raise NotImplementedError
