@@ -197,4 +197,4 @@ Sugestões e melhorias são bem-vindas. Para contribuir:
 
 ## Licença
 
-Nenhuma licença foi identificada nos arquivos analisados. Antes de redistribuir ou reutilizar o projeto, defina uma licença e inclua o arquivo `LICENSE`.
+Projeto de estudo, sem licença de uso comercial definida.
